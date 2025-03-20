@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>多模态交互示例 - GestureArea</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+            --text-color: #333;
+            --light-bg: #f9f9f9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+
+        .demo-title {
+            font-weight: 600;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        .status {
+            margin: 10px 0;
+            font-size: 14px;
+            font-style: italic;
+            color: #666;
+        }
+
+        gesture-area {
+            display: block;
+            width: 100%;
+            height: 300px;
+            position: relative;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        gesture-area.demo-image {
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        gesture-area img {
+            max-width: 100%;
+            max-height: 100%;
+            transition: transform 0.3s ease;
+        }
+
+        .shake-animation {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;/*实现速度变化*/
+        }
+        /*css关键帧实现平滑过渡*/
+        @keyframes shake {
+            10%, 90% {
+                transform: translate3d(-1px, 0, 0);
+            }
+            20%, 80% {
+                transform: translate3d(2px, 0, 0);
+            }
+            30%, 50%, 70% {
+                transform: translate3d(-4px, 0, 0);
+            }
+            40%, 60% {
+                transform: translate3d(4px, 0, 0);
+            }
+        }
+
+        .command-list {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;/*外边距*/
+        }
+
+        .command-list li {
+            margin: 5px 0;
+        }
+
+        .feedback {
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            height: 24px;
+        }
+
+        .shake-ad {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            z-index: 100;
+            text-align: center;
+            max-width: 80%;
+            display: none;
+        }
+
+        .shake-ad img {
+            max-width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>多模态交互演示</h1>
+        
+        <div class="demo-section">
+            <h2 class="demo-title">1. 图片操作演示</h2>
+            <div class="status">使用双指缩放、单指拖拽或旋转手势操作下方图片</div>
+            
+            <gesture-area class="demo-image" 
+                          data-gestures="pan,pinch,rotate"
+                          data-voice-commands="true">
+                <img src="https://s11.ax1x.com/2022/10/04/xlSQAA.jpg" alt="演示图片" id="demo-image">
+            </gesture-area>
+            
+            <div class="feedback" id="image-feedback"></div>
+            
+            <div class="controls">
+                <button id="reset-image">重置图片</button>
+                <button id="toggle-voice">开启语音控制</button>
+            </div>
+            
+            <div class="command-list">
+                <p>语音命令：</p>
+                <ul>
+                    <li>"放大"/"缩小"：缩放图片</li>
+                    <li>"旋转"：旋转图片</li>
+                    <li>"重置"：重置图片位置</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2 class="demo-title">2. 摇一摇广告演示</h2>
+            <div class="status">在移动设备上摇动手机或点击下方按钮模拟摇一摇效果</div>
+            
+            <gesture-area data-shake="true" data-shake-threshold="15">
+                <div style="text-align: center; padding: 20px;">
+                    <h3>摇一摇区域</h3>
+                    <p>摇动设备或点击下方按钮触发广告</p>
+                </div>
+            </gesture-area>
+            
+            <div class="feedback" id="shake-feedback"></div>
+            
+            <div class="controls">
+                <button id="simulate-shake">模拟摇一摇</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 摇一摇广告 -->
+    <div class="shake-ad" id="shake-ad">
+        <button class="close-btn" id="close-ad">×</button>
+        <img src="https://s11.ax1x.com/2022/10/04/xlSQAA.jpg" alt="广告">
+        <h3>恭喜您获得特别优惠!</h3>
+        <p>使用代码 SHAKE2025 获取 20% 的折扣</p>
+        <button>立即查看</button>
+    </div>
+
+    <script>
+        /**
+         * GestureArea 自定义元素类
+         * 实现多模态交互（手势、触摸、语音）功能
+         */
+        class GestureArea extends HTMLElement {
+            constructor() {
+                super();
+                
+                // 初始状态
+                this.state = {
+                    // 拖拽相关
+                    isPanning: false,
+                    startX: 0,
+                    startY: 0,
+                    translateX: 0,
+                    translateY: 0,
+                    
+                    // 缩放相关
+                    isPinching: false,
+                    initialDistance: 0,
+                    scale: 1,
+                    
+                    // 旋转相关
+                    isRotating: false,
+                    initialAngle: 0,
+                    rotation: 0,
+                    
+                    // 语音识别相关
+                    recognition: null,
+                    isListening: false,
+                    
+                    // 摇一摇相关
+                    isShakeEnabled: false,
+                    shakeThreshold: 15,
+                    lastX: 0,
+                    lastY: 0,
+                    lastZ: 0,
+                    lastShakeTime: 0
+                };
+                
+                // 绑定方法到实例
+                this.handleTouchStart = this.handleTouchStart.bind(this);
+                this.handleTouchMove = this.handleTouchMove.bind(this);
+                this.handleTouchEnd = this.handleTouchEnd.bind(this);
+                this.handleMouseDown = this.handleMouseDown.bind(this);
+                this.handleMouseMove = this.handleMouseMove.bind(this);
+                this.handleMouseUp = this.handleMouseUp.bind(this);
+                this.handleDeviceMotion = this.handleDeviceMotion.bind(this);
+                this.processVoiceCommand = this.processVoiceCommand.bind(this);
+                this.setupVoiceRecognition = this.setupVoiceRecognition.bind(this);
+            }
+            
+            // 当元素被添加到DOM时调用
+            connectedCallback() {
+                this.setupElement();
+                this.setupEventListeners();
+                this.setupFeatures();
+            }
+            
+            // 当元素从DOM中移除时调用
+            disconnectedCallback() {
+                this.removeEventListeners();
+                
+                if (this.state.isShakeEnabled) {
+                    window.removeEventListener('devicemotion', this.handleDeviceMotion);
+                }
+                
+                if (this.state.recognition) {
+                    this.state.recognition.stop();
+                }
+            }
+            
+            // 初始化元素
+            setupElement() {
+                // 确保元素可以接收指针事件
+                this.style.touchAction = 'none';
+                
+                // 解析属性
+                const gestures = this.getAttribute('data-gestures');
+                if (gestures) {
+                    this.enabledGestures = gestures.split(',');
+                } else {
+                    this.enabledGestures = ['pan', 'pinch', 'rotate']; // 默认启用所有手势
+                }
+                
+                // 设置声音命令
+                if (this.getAttribute('data-voice-commands') === 'true') {
+                    this.setupVoiceRecognition();
+                }
+                
+                // 设置摇一摇
+                if (this.getAttribute('data-shake') === 'true') {
+                    this.state.isShakeEnabled = true;
+                    this.state.shakeThreshold = parseInt(this.getAttribute('data-shake-threshold')) || 15;
+                    
+                    // 检查设备运动传感器支持
+                    if (window.DeviceMotionEvent) {
+                        window.addEventListener('devicemotion', this.handleDeviceMotion);
+                    }
+                }
+            }
+            
+            // 设置事件监听器
+            setupEventListeners() {
+                // 触摸事件
+                this.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+                this.addEventListener('touchmove', this.handleTouchMove, { passive: false });
+                this.addEventListener('touchend', this.handleTouchEnd);
+                
+                // 鼠标事件
+                this.addEventListener('mousedown', this.handleMouseDown);
+                // 鼠标移动和释放事件在实际使用时添加/移除
+            }
+            
+            // 移除事件监听器
+            removeEventListeners() {
+                this.removeEventListener('touchstart', this.handleTouchStart);
+                this.removeEventListener('touchmove', this.handleTouchMove);
+                this.removeEventListener('touchend', this.handleTouchEnd);
+                this.removeEventListener('mousedown', this.handleMouseDown);
+                document.removeEventListener('mousemove', this.handleMouseMove);
+                document.removeEventListener('mouseup', this.handleMouseUp);
+            }
+            
+            // 设置特性功能
+            setupFeatures() {
+                const targetImg = this.querySelector('img');
+                if (targetImg) {
+                    // 存储目标图片引用
+                    this.targetImage = targetImg;
+                    
+                    // 设置初始变换
+                    this.updateTransform();
+                }
+            }
+            
+            // 处理触摸开始事件
+            handleTouchStart(e) {
+                e.preventDefault();
+                
+                if (e.touches.length === 1 && this.enabledGestures.includes('pan')) {
+                    // 单指拖动
+                    this.state.isPanning = true;
+                    this.state.startX = e.touches[0].clientX - this.state.translateX;
+                    this.state.startY = e.touches[0].clientY - this.state.translateY;
+                }
+                else if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    
+                    if (this.enabledGestures.includes('pinch')) {
+                        // 双指缩放
+                        this.state.isPinching = true;
+                        this.state.initialDistance = this.getDistance(
+                            touch1.clientX, touch1.clientY, 
+                            touch2.clientX, touch2.clientY
+                        );
+                    }
+                    
+                    if (this.enabledGestures.includes('rotate')) {
+                        // 旋转
+                        this.state.isRotating = true;
+                        this.state.initialAngle = this.getAngle(
+                            touch1.clientX, touch1.clientY, 
+                            touch2.clientX, touch2.clientY
+                        );
+                    }
+                }
+            }
+            
+            // 处理触摸移动事件
+            handleTouchMove(e) {
+                e.preventDefault();
+                
+                if (this.state.isPanning && e.touches.length === 1) {
+                    // 处理拖动
+                    const touch = e.touches[0];
+                    this.state.translateX = touch.clientX - this.state.startX;
+                    this.state.translateY = touch.clientY - this.state.startY;
+                    this.updateTransform();
+                    this.updateFeedback('移动中');
+                }
+                else if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    
+                    if (this.state.isPinching) {
+                        // 处理缩放
+                        const currentDistance = this.getDistance(
+                            touch1.clientX, touch1.clientY, 
+                            touch2.clientX, touch2.clientY
+                        );
+                        
+                        const scaleFactor = currentDistance / this.state.initialDistance;
+                        this.state.scale = Math.max(0.5, Math.min(3, scaleFactor));
+                        this.updateTransform();
+                        this.updateFeedback('缩放中');
+                    }
+                    
+                    if (this.state.isRotating) {
+                        // 处理旋转
+                        const currentAngle = this.getAngle(
+                            touch1.clientX, touch1.clientY, 
+                            touch2.clientX, touch2.clientY
+                        );
+                        
+                        const angleDiff = currentAngle - this.state.initialAngle;
+                        this.state.rotation = angleDiff;
+                        this.updateTransform();
+                        this.updateFeedback('旋转中');
+                    }
+                }
+            }
+            
+            // 处理触摸结束事件
+            handleTouchEnd() {
+                this.state.isPanning = false;
+                this.state.isPinching = false;
+                this.state.isRotating = false;
+                this.updateFeedback('');
+            }
+            
+            // 处理鼠标按下事件
+            handleMouseDown(e) {
+                e.preventDefault();
+                
+                if (this.enabledGestures.includes('pan')) {
+                    this.state.isPanning = true;
+                    this.state.startX = e.clientX - this.state.translateX;
+                    this.state.startY = e.clientY - this.state.translateY;
+                    
+                    document.addEventListener('mousemove', this.handleMouseMove);
+                    document.addEventListener('mouseup', this.handleMouseUp);
+                }
+            }
+            
+            // 处理鼠标移动事件
+            handleMouseMove(e) {
+                e.preventDefault();
+                
+                if (this.state.isPanning) {
+                    this.state.translateX = e.clientX - this.state.startX;
+                    this.state.translateY = e.clientY - this.state.startY;
+                    this.updateTransform();
+                    this.updateFeedback('移动中');
+                }
+            }
+            
+            // 处理鼠标释放事件
+            handleMouseUp() {
+                this.state.isPanning = false;
+                document.removeEventListener('mousemove', this.handleMouseMove);
+                document.removeEventListener('mouseup', this.handleMouseUp);
+                this.updateFeedback('');
+            }
+            
+            // 处理设备运动事件（摇一摇）
+            handleDeviceMotion(e) {
+                if (!this.state.isShakeEnabled) return;
+                
+                const acceleration = e.accelerationIncludingGravity;
+                if (!acceleration) return;
+                
+                const currentTime = new Date().getTime();
+                const timeDifference = currentTime - this.state.lastShakeTime;
+                
+                // 每100ms检测一次
+                if (timeDifference > 100) {
+                    const deltaX = Math.abs(this.state.lastX - acceleration.x);
+                    const deltaY = Math.abs(this.state.lastY - acceleration.y);
+                    const deltaZ = Math.abs(this.state.lastZ - acceleration.z);
+                    
+                    // 判断是否达到摇动阈值
+                    if ((deltaX > this.state.shakeThreshold && (deltaY > 5 || deltaZ > 5)) || 
+                        (deltaY > this.state.shakeThreshold && (deltaX > 5 || deltaZ > 5)) ||
+                        (deltaZ > this.state.shakeThreshold && (deltaX > 5 || deltaY > 5))) {
+                        
+                        this.triggerShakeEvent();
+                        this.state.lastShakeTime = currentTime;
+                    }
+                    
+                    this.state.lastX = acceleration.x;
+                    this.state.lastY = acceleration.y;
+                    this.state.lastZ = acceleration.z;
+                }
+            }
+            
+            // 设置语音识别
+            setupVoiceRecognition() {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    console.warn('此浏览器不支持语音识别');
+                    return;
+                }
+                
+                // 创建语音识别对象
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                this.state.recognition = new SpeechRecognition();
+                this.state.recognition.continuous = true;
+                this.state.recognition.interimResults = false;
+                this.state.recognition.lang = 'zh-CN';
+                
+                // 处理结果
+                //这是一个事件处理函数，当识别到语音结果时会被调用
+                this.state.recognition.onresult = (event) => {
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        if (event.results[i].isFinal) {
+                            //是否为最终结果
+                            const command = event.results[i][0].transcript.trim().toLowerCase();
+                            this.processVoiceCommand(command);
+                        }
+                    }
+                };
+                
+                // 错误处理
+                this.state.recognition.onerror = (event) => {
+                    console.error('语音识别错误:', event.error);
+                    this.updateFeedback(`语音识别错误: ${event.error}`);
+                };
+            }
+            
+            // 开始语音识别
+            startVoiceRecognition() {
+                if (!this.state.recognition) {
+                    this.setupVoiceRecognition();
+                }
+                
+                if (this.state.recognition && !this.state.isListening) {
+                    this.state.recognition.start();
+                    this.state.isListening = true;
+                    this.updateFeedback('语音识别已启动，请说出命令');
+                }
+            }
+            
+            // 停止语音识别
+            stopVoiceRecognition() {
+                if (this.state.recognition && this.state.isListening) {
+                    this.state.recognition.stop();
+                    this.state.isListening = false;
+                    this.updateFeedback('语音识别已停止');
+                }
+            }
+            
+            // 处理语音命令
+            processVoiceCommand(command) {
+                const feedback = document.getElementById('image-feedback');
+                if (feedback) {
+                    feedback.textContent = `识别的命令: "${command}"`;
+                }
+                
+                // 判断命令并执行相应操作
+                if (command.includes('放大')) {
+                    this.state.scale *= 1.2;
+                    this.updateTransform();
+                    this.updateFeedback('执行放大命令');
+                } 
+                else if (command.includes('缩小')) {
+                    this.state.scale /= 1.2;
+                    this.updateTransform();
+                    this.updateFeedback('执行缩小命令');
+                } 
+                else if (command.includes('旋转')) {
+                    this.state.rotation += 90;
+                    this.updateTransform();
+                    this.updateFeedback('执行旋转命令');
+                } 
+                else if (command.includes('重置')) {
+                    this.resetTransform();
+                    this.updateFeedback('执行重置命令');
+                }
+            }
+            
+            // 触发摇一摇事件
+            triggerShakeEvent() {
+                // 创建并分发自定义事件
+                const shakeEvent = new CustomEvent('shake', {
+                    bubbles: true,
+                    detail: { timestamp: new Date().getTime() }
+                });
+                
+                this.dispatchEvent(shakeEvent);
+                
+                // 执行摇一摇效果
+                this.classList.add('shake-animation');
+                
+                setTimeout(() => {
+                    this.classList.remove('shake-animation');
+                }, 500);
+                
+                // 更新反馈
+                const feedback = document.getElementById('shake-feedback');
+                if (feedback) {
+                    feedback.textContent = '检测到摇一摇！';
+                    
+                    setTimeout(() => {
+                        feedback.textContent = '';
+                    }, 2000);
+                }
+                
+                // 显示广告
+                this.showShakeAd();
+            }
+            
+            // 显示摇一摇广告
+            showShakeAd() {
+                const adElement = document.getElementById('shake-ad');
+                if (adElement) {
+                    adElement.style.display = 'block';
+                }
+            }
+            
+            // 计算两点之间的距离
+            getDistance(x1, y1, x2, y2) {
+                return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            }
+            
+            // 计算两点形成的角度
+            getAngle(x1, y1, x2, y2) {
+                return Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            }
+            
+            // 更新变换样式
+            //根据当前存储的拖拽、缩放和旋转状态拼接出 CSS transform 属性字符串，并应用到目标图片上。
+            updateTransform() {
+                if (!this.targetImage) return;
+                
+                const transform = `
+                    translate(${this.state.translateX}px, ${this.state.translateY}px)
+                    scale(${this.state.scale})
+                    rotate(${this.state.rotation}deg)
+                `;
+                
+                this.targetImage.style.transform = transform;
+            }
+            
+            // 重置变换
+            resetTransform() {
+                this.state.translateX = 0;
+                this.state.translateY = 0;
+                this.state.scale = 1;
+                this.state.rotation = 0;
+                this.updateTransform();
+                this.updateFeedback('已重置');
+            }
+            
+            // 更新反馈信息
+            updateFeedback(message) {
+                const feedback = document.getElementById('image-feedback');
+                if (feedback) {
+                    feedback.textContent = message;
+                }
+            }
+        }
+        
+        // 注册自定义元素
+        customElements.define('gesture-area', GestureArea);
+        
+        // 页面初始化逻辑
+        document.addEventListener('DOMContentLoaded', () => {
+            // 重置图片按钮
+            const resetButton = document.getElementById('reset-image');
+            if (resetButton) {
+                resetButton.addEventListener('click', () => {
+                    const gestureArea = document.querySelector('gesture-area.demo-image');
+                    if (gestureArea) {
+                        gestureArea.resetTransform();
+                    }
+                });
+            }
+            
+            // 语音控制切换按钮
+            const voiceToggle = document.getElementById('toggle-voice');
+            if (voiceToggle) {
+                let voiceActive = false;
+                voiceToggle.addEventListener('click', () => {
+                    const gestureArea = document.querySelector('gesture-area[data-voice-commands="true"]');
+                    if (gestureArea) {
+                        if (voiceActive) {
+                            gestureArea.stopVoiceRecognition();
+                            voiceToggle.textContent = '开启语音控制';
+                        } else {
+                            gestureArea.startVoiceRecognition();
+                            voiceToggle.textContent = '关闭语音控制';
+                        }
+                        voiceActive = !voiceActive;
+                    }
+                });
+            }
+            
+            // 模拟摇一摇按钮
+            const shakeButton = document.getElementById('simulate-shake');
+            if (shakeButton) {
+                shakeButton.addEventListener('click', () => {
+                    const gestureArea = document.querySelector('gesture-area[data-shake="true"]');
+                    if (gestureArea) {
+                        gestureArea.triggerShakeEvent();
+                    }
+                });
+            }
+            
+            // 关闭广告按钮
+            const closeAdButton = document.getElementById('close-ad');
+            if (closeAdButton) {
+                closeAdButton.addEventListener('click', () => {
+                    const ad = document.getElementById('shake-ad');
+                    if (ad) {
+                        ad.style.display = 'none';
+                    }
+                });
+            }
+
+            // 监听摇一摇事件
+            document.addEventListener('shake', (e) => {
+                console.log('Shake event detected!', e.detail);
+            });
+        });
+    </script>
+</body>
+</html>

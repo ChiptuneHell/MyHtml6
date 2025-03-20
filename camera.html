@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄像头组件演示</title>
+    <style>
+        camera-web {
+            display: block;
+            margin: 20px auto;
+            max-width: 800px;
+        }
+    </style>
+</head>
+<body>
+    <h1>摄像头组件演示</h1>
+    <!-- 使用自定义标签 -->
+    <camera-web></camera-web>
+
+    <script>
+        // 定义摄像头Web组件
+        class CameraWeb extends HTMLElement {
+            constructor() {
+                super();
+                // 创建Shadow DOM
+                this.attachShadow({ mode: 'open' });
+                
+                // 初始化属性
+                this.currentFacingMode = 'user'; // 默认前置摄像头
+                this.currentEffect = 'none';     // 默认无滤镜
+                this.isRecording = false;        // 录像状态
+                this.mediaRecorder = null;       // 媒体录制器
+                this.recordedChunks = [];        // 录制的数据块
+            }
+            
+            connectedCallback() {
+                this.render();
+                this.initCamera();
+            }
+            
+            render() {
+                this.shadowRoot.innerHTML = `
+                    <style>
+                        :host {
+                            display: block;
+                            font-family: Arial, sans-serif;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        
+                        .camera-container {
+                            border-radius: 10px;
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                            overflow: hidden;
+                            background-color: #222;
+                            padding: 10px;
+                        }
+                        
+                        .video-container {
+                            position: relative;
+                            width: 100%;
+                            background-color: #000;
+                            border-radius: 8px;
+                            overflow: hidden;
+                        }
+                        
+                        video {
+                            width: 100%;
+                            display: block;
+                        }
+                        
+                        .controls {
+                            display: flex;
+                            flex-wrap: wrap;
+                            justify-content: center;
+                            gap: 10px;
+                            margin-top: 10px;
+                            padding: 10px;
+                            background-color: #333;
+                            border-radius: 8px;
+                        }
+                        
+                        button {
+                            padding: 8px 16px;
+                            border: none;
+                            border-radius: 5px;
+                            background-color: #4285f4;
+                            color: white;
+                            font-weight: bold;
+                            cursor: pointer;
+                            transition: background-color 0.2s;
+                        }
+                        
+                        button:hover {
+                            background-color: #3367d6;
+                        }
+                        
+                        button:active {
+                            background-color: #2a56c6;
+                        }
+                        
+                        button.recording {
+                            background-color: #e53935;
+                            animation: pulse 1.5s infinite;
+                        }
+                        
+                        select {
+                            padding: 8px;
+                            border-radius: 5px;
+                            border: none;
+                            background-color: #444;
+                            color: white;
+                        }
+                        
+                        .gallery {
+                            margin-top: 15px;
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                            gap: 10px;
+                            max-height: 220px;
+                            overflow-y: auto;
+                            padding: 10px;
+                            background-color: #333;
+                            border-radius: 8px;
+                        }
+                        
+                        .gallery img, .gallery video {
+                            width: 100%;
+                            height: 150px;
+                            object-fit: cover;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            transition: transform 0.2s;
+                        }
+                        
+                        .gallery img:hover, .gallery video:hover {
+                            transform: scale(1.05);
+                        }
+                        
+                        .status {
+                            padding: 5px 10px;
+                            margin-top: 10px;
+                            background-color: #333;
+                            color: #aaa;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            text-align: center;
+                        }
+                        
+                        @keyframes pulse {
+                            0% { opacity: 1; }
+                            50% { opacity: 0.7; }
+                            100% { opacity: 1; }
+                        }
+                        
+                        .sepia { filter: sepia(100%); }
+                        .grayscale { filter: grayscale(100%); }
+                        .invert { filter: invert(100%); }
+                        .blur { filter: blur(3px); }
+                    </style>
+                    
+                    <div class="camera-container">
+                        <div class="video-container">
+                            <video id="video" autoplay playsinline></video>
+                        </div>
+                        
+                        <div class="controls">
+                            <button id="switchCamera">切换摄像头</button>
+                            <button id="takePhoto">拍照</button>
+                            <button id="recordVideo">开始录像</button>
+                            
+                            <select id="effectSelect">
+                                <option value="none">无效果</option>
+                                <option value="sepia">复古</option>
+                                <option value="grayscale">黑白</option>
+                                <option value="invert">反色</option>
+                                <option value="blur">模糊</option>
+                            </select>
+                        </div>
+                        
+                        <div class="status" id="status">摄像头已就绪</div>
+                        
+                        <div class="gallery" id="gallery"></div>
+                    </div>
+                `;
+                
+                // 添加事件监听器
+                this.attachEventListeners();
+            }
+            
+            attachEventListeners() {
+                const videoElement = this.shadowRoot.getElementById('video');
+                const switchButton = this.shadowRoot.getElementById('switchCamera');
+                const photoButton = this.shadowRoot.getElementById('takePhoto');
+                const recordButton = this.shadowRoot.getElementById('recordVideo');
+                const effectSelect = this.shadowRoot.getElementById('effectSelect');
+                
+                switchButton.addEventListener('click', () => this.switchCamera());
+                photoButton.addEventListener('click', () => this.takePhoto());
+                recordButton.addEventListener('click', () => this.toggleRecording());
+                effectSelect.addEventListener('change', (e) => this.applyEffect(e.target.value));
+            }
+            
+            async initCamera() {
+                try {
+                    const videoElement = this.shadowRoot.getElementById('video');
+                    const status = this.shadowRoot.getElementById('status');
+                    
+                    status.textContent = "正在访问摄像头...";
+                    
+                    const constraints = {
+                        video: { 
+                            facingMode: this.currentFacingMode,
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: true
+                    };
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);//请求媒体流
+                    videoElement.srcObject = stream;
+                    this.stream = stream;
+                    
+                    status.textContent = "摄像头已就绪";
+                } catch (err) {//异常处理
+                    console.error("摄像头访问错误:", err);
+                    this.shadowRoot.getElementById('status').textContent = 
+                        "无法访问摄像头: " + (err.message || "未知错误");
+                }
+            }
+            
+            switchCamera() {
+                // 切换前后摄像头
+                this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+                
+                // 停止当前流
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // 重新初始化摄像头
+                this.initCamera();
+            }
+            
+            applyEffect(effect) {
+                const video = this.shadowRoot.getElementById('video');
+                
+                // 移除所有现有效果
+                video.classList.remove('sepia', 'grayscale', 'invert', 'blur');
+                
+                // 应用新效果
+                if (effect !== 'none') {
+                    video.classList.add(effect);
+                }
+                
+                this.currentEffect = effect;
+                this.shadowRoot.getElementById('status').textContent = 
+                    `应用效果: ${this.getEffectName(effect)}`;
+            }
+            
+            getEffectName(effect) {
+                const effects = {
+                    'none': '无效果',
+                    'sepia': '复古',
+                    'grayscale': '黑白',
+                    'invert': '反色',
+                    'blur': '模糊'
+                };
+                return effects[effect] || '未知效果';
+            }
+            
+            takePhoto() {
+                const video = this.shadowRoot.getElementById('video');
+                const gallery = this.shadowRoot.getElementById('gallery');
+                const status = this.shadowRoot.getElementById('status');
+                
+                // 创建画布并截取视频帧
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // 应用当前效果到截图上
+                if (this.currentEffect !== 'none') {
+                    context.filter = this.getCssFilter(this.currentEffect);
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    context.filter = 'none';
+                }
+                
+                // 转换为图片并添加到画廊
+                const imgUrl = canvas.toDataURL('image/png');
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.title = new Date().toLocaleString();
+                
+                img.addEventListener('click', () => {
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    link.href = imgUrl;
+                    link.download = `photo_${Date.now()}.png`;
+                    link.click();
+                    status.textContent = '照片已下载';
+                });
+                
+                gallery.prepend(img);
+                status.textContent = '照片已保存到画廊 (点击可下载)';
+            }
+            
+            getCssFilter(effect) {
+                const filters = {
+                    'sepia': 'sepia(100%)',
+                    'grayscale': 'grayscale(100%)',
+                    'invert': 'invert(100%)',
+                    'blur': 'blur(3px)',
+                    'none': 'none'
+                };
+                return filters[effect] || 'none';
+            }
+            
+            toggleRecording() {
+                const recordButton = this.shadowRoot.getElementById('recordVideo');
+                const status = this.shadowRoot.getElementById('status');
+                
+                if (this.isRecording) {
+                    // 停止录制
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    recordButton.textContent = "开始录像";
+                    recordButton.classList.remove('recording');
+                    status.textContent = "录像已停止";
+                } else {
+                    // 开始录制
+                    this.recordedChunks = [];
+                    
+                    // 确认流是可用的
+                    if (!this.stream) {
+                        status.textContent = "没有可用的摄像头流，无法开始录制";
+                        return;
+                    }
+                    
+                    // 创建媒体录制器
+                    this.mediaRecorder = new MediaRecorder(this.stream, {
+                        mimeType: 'video/webm;codecs=vp9'
+                    });
+                    
+                    // 处理数据可用事件
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordedChunks.push(event.data);
+                        }
+                    };
+                    
+                    // 处理停止事件
+                    this.mediaRecorder.onstop = () => {
+                        // 创建视频Blob
+                        const videoBlob = new Blob(this.recordedChunks, {
+                            type: 'video/webm'
+                        });
+                        const videoUrl = URL.createObjectURL(videoBlob);
+                        
+                        // 创建视频元素并添加到画廊
+                        const videoElement = document.createElement('video');
+                        videoElement.src = videoUrl;
+                        videoElement.controls = true;
+                        videoElement.title = new Date().toLocaleString();
+                        
+                        videoElement.addEventListener('click', () => {
+                            // 创建下载链接
+                            const link = document.createElement('a');
+                            link.href = videoUrl;
+                            link.download = `video_${Date.now()}.webm`;
+                            link.click();
+                            status.textContent = '视频已下载';
+                        });
+                        
+                        const gallery = this.shadowRoot.getElementById('gallery');
+                        gallery.prepend(videoElement);
+                        status.textContent = '视频已保存到画廊 (点击可下载)';
+                    };
+                    
+                    // 开始录制
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    recordButton.textContent = "停止录像";
+                    recordButton.classList.add('recording');
+                    status.textContent = "正在录像...";
+                }
+            }
+            
+            disconnectedCallback() {
+                // 清理摄像头资源
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                }
+            }
+        }
+        
+        // 注册自定义元素
+        customElements.define('camera-web', CameraWeb);
+    </script>
+</body>
+</html>
